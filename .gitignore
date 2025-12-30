@@ -1,0 +1,10 @@
+.env
+backend/.env
+
+backend/service-account.json
+backend/.tokens/
+backend/tokens/
+
+*.log
+node_modules/
+dist/

@@ -1,0 +1,153 @@
+.login-first{
+    height: 100vh;
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    background-color: #f9fafb;
+}
+
+.inside-login-first{
+    height: 100%;    
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+
+.inside-login-first form {
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+    height: 20rem;
+    width: 25rem;
+    background-color: #fff;
+    box-shadow: rgba(0, 0, 0, 0.05) 0px 1px 2px 0px;
+    border-radius: 1rem;
+}
+
+.inside-login-first-img{
+    height: 100%;
+    width: 60%;
+    display: flex;
+    justify-content: center;
+    align-items: center;
+    position: relative;
+}
+
+
+.inside-login-first-img::before{
+    content: '';
+    position: absolute;
+    background-image: url(/images/admin.avif);
+    height: 100%;
+    width: 100%;
+    background-position: left;
+    background-repeat: no-repeat;
+    background-size: cover;
+}
+
+
+.inside-login-first-form{
+    height: 100%;
+    width: 40%;
+    display: flex;
+    flex-direction: column;
+    justify-content: center;
+    align-items: center;
+}
+
+.inside-login-first-form h1 {
+    font-weight: 600;
+    font-size: 22px;
+    text-transform: uppercase;
+    color: #2b2b2b;
+    letter-spacing: 1px;
+    word-spacing: 6px;
+    margin-bottom: 2rem;
+}
+
+.inside-login-first-form form input {
+    border-radius: 2rem;
+    outline: none;
+    border: none;
+    border-bottom: 1px solid #e2e2e2;
+    padding: 0.5rem;
+    width: 70%;
+    margin-bottom: 1rem;
+    background: #f9f9f9;
+    font-size: 12px;
+}
+
+
+.inside-login-first-form form button {
+    background: #0e140e;
+    outline: none;
+    border: none;
+    color: #fff;
+    border-radius: 2rem;
+    padding: 0.5rem 1rem;
+    text-transform: uppercase;
+    font-size: 12px;
+    margin-top: 1rem;
+    font-weight: 500;
+    cursor: pointer;
+}
+
+
+
+
+/* TEST  */
+
+
+
+/* Create Project Modal Overlay */
+.project-form-modal-overlay{
+  position: fixed;
+  inset: 0;
+  background: rgba(0,0,0,0.45);
+  backdrop-filter: blur(6px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+  padding: 18px;
+}
+
+/* Modal Card */
+.project-form-modal{
+  width: min(720px, 100%);
+  background: #fff;
+  border-radius: 18px;
+  box-shadow: 0 20px 60px rgba(0,0,0,0.25);
+  padding: 16px;
+}
+
+/* header row */
+.project-form-header{
+  display:flex;
+  align-items:center;
+  justify-content:space-between;
+  margin-bottom: 10px;
+}
+
+.close-project-form{
+  border: none;
+  background: #f2f2f2;
+  width: 40px;
+  height: 40px;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 18px;
+}
+
+.team-multi-select{
+  width: 100%;
+  min-height: 140px;
+  padding: 10px;
+  border-radius: 12px;
+  border: 1px solid #ddd;
+  background: #fff;
+}
