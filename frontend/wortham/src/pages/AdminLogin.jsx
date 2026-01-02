@@ -8,12 +8,17 @@ export const AdminLogin = ({ onLoginSuccess }) => {
   const [loading, setLoading] = useState(false); // ✅ boolean
 
   const loginHandle = async (e) => {
+
+
+    const API = import.meta.env.VITE_API_URL;
+
+
     e.preventDefault();
     setError("");
     setLoading(true);
 
     try {
-      const res = await fetch("http://localhost:5000/api/auth/login", {
+      const res = await fetch(`${API}/api/auth/login`, {
         method: "POST",
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({ email, password }),

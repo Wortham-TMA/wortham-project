@@ -6,6 +6,9 @@ export const UploadToDrive = ({ clientId, onUploaded, onError }) => {
   const [msg, setMsg] = useState("");
   const [progress, setProgress] = useState(0);
 
+
+  const API = import.meta.env.VITE_API_URL;
+
   // ✅ list states
   const [files, setFiles] = useState([]);
   const [loadingList, setLoadingList] = useState(false);
@@ -34,7 +37,7 @@ export const UploadToDrive = ({ clientId, onUploaded, onError }) => {
       setMsg("");
       setBusy(true);
 
-      const res = await fetch("http://localhost:5000/api/files/google/connect", {
+      const res = await fetch(`${API}/api/files/google/connect`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -57,7 +60,7 @@ export const UploadToDrive = ({ clientId, onUploaded, onError }) => {
       if (!clientId) return;
       setLoadingList(true);
 
-      const res = await fetch(`http://localhost:5000/api/files/list/${clientId}`, {
+      const res = await fetch(`${API}/api/files/list/${clientId}`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -98,7 +101,7 @@ export const UploadToDrive = ({ clientId, onUploaded, onError }) => {
       await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
 
-        xhr.open("POST", `http://localhost:5000/api/files/upload/${clientId}`, true);
+        xhr.open("POST", `${API}/api/files/upload/${clientId}`, true);
         xhr.setRequestHeader("Authorization", `Bearer ${token}`);
 
         xhr.upload.onprogress = (evt) => {

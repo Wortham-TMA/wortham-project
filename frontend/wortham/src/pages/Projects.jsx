@@ -4,6 +4,14 @@ import { useEffect, useMemo, useState } from "react";
 import { UploadToDrive } from "../components/UploadToDrive"; // ✅ add this
 
 export const Projects = () => {
+
+
+
+  const API = import.meta.env.VITE_API_URL;
+
+
+
+
   const [showForm, setShowForm] = useState(false);
 
   // form states
@@ -61,9 +69,9 @@ export const Projects = () => {
       const headers = { Authorization: `Bearer ${token}` };
 
       const [teamRes, clientRes, projectRes] = await Promise.all([
-        fetch("http://localhost:5000/api/admin/teams", { headers }),
-        fetch("http://localhost:5000/api/admin/clients", { headers }),
-        fetch("http://localhost:5000/api/admin/projects", { headers }),
+        fetch(`${API}/api/admin/teams`, { headers }),
+        fetch(`${API}/api/admin/clients`, { headers }),
+        fetch(`${API}/api/admin/projects`, { headers }),
       ]);
 
       const teamData = await safeJson(teamRes);
@@ -108,7 +116,7 @@ export const Projects = () => {
     try {
       if (!name || !clientId) throw new Error("Project name and client are required");
 
-      const res = await fetch("http://localhost:5000/api/admin/projects", {
+      const res = await fetch(`${API}/api/admin/projects`, {
         method: "POST",
         headers: {
           "Content-Type": "application/json",
@@ -151,7 +159,7 @@ export const Projects = () => {
   // 🔹 Only projects refresh
   const fetchProjectsOnly = async () => {
     try {
-      const res = await fetch("http://localhost:5000/api/admin/projects", {
+      const res = await fetch(`${API}/api/admin/projects`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -192,7 +200,7 @@ export const Projects = () => {
       setSavingStageKey(stageKey);
 
       const res = await fetch(
-        `http://localhost:5000/api/admin/projects/${projectId}/stages/${stageKey}`,
+        `${API}/api/admin/projects/${projectId}/stages/${stageKey}`,
         {
           method: "PATCH",
           headers: {

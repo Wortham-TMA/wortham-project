@@ -5,6 +5,8 @@ import { IoIosClose } from "react-icons/io";
 
 export const Team = () => {
 
+  const API = import.meta.env.VITE_API_URL;
+
     const [showForm, setShowForm] = useState(false);
 
 
@@ -34,7 +36,7 @@ export const Team = () => {
 
                 const token = localStorage.getItem("token");
 
-                const res = await fetch("http://localhost:5000/api/admin/create-team", {
+                const res = await fetch(`${API}/api/admin/create-team`, {
                   method: "POST",
                   headers: {
                     "Content-Type": "application/json",
@@ -79,7 +81,7 @@ export const Team = () => {
     setLoadingList(true);
     const token = localStorage.getItem("token");
 
-    const res = await fetch("http://localhost:5000/api/admin/teams", {
+    const res = await fetch(`${API}/api/admin/teams`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },

@@ -2,6 +2,9 @@ import { useEffect, useMemo, useState } from "react";
 import { UploadToDrive } from "../components/UploadToDrive";
 
 export const TeamTask = () => {
+
+const API = import.meta.env.VITE_API_URL;
+
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState(null);
 
@@ -45,7 +48,7 @@ export const TeamTask = () => {
       setMsg("");
 
       const token = getToken();
-      const res = await fetch("http://localhost:5000/api/team/my-projects", {
+      const res = await fetch(`${API}/api/team/my-projects`, {
         headers: { Authorization: `Bearer ${token}` },
       });
 
@@ -67,7 +70,7 @@ export const TeamTask = () => {
 
       const token = getToken();
       const res = await fetch(
-        `http://localhost:5000/api/team/projects/${projectId}/stages/${key}`,
+        `${API}/api/team/projects/${projectId}/stages/${key}`,
         {
           method: "PATCH",
           headers: {

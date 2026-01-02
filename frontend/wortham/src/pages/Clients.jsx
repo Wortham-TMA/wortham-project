@@ -4,6 +4,9 @@ import { IoIosClose } from "react-icons/io";
 
 export const Clients = () => {
 
+    const API = import.meta.env.VITE_API_URL;
+
+
 
     const [showForm, setShowForm] = useState(false);
 
@@ -25,7 +28,7 @@ export const Clients = () => {
     setLoadingList(true);
     const token = localStorage.getItem("token");
 
-    const res = await fetch("http://localhost:5000/api/admin/clients", {
+    const res = await fetch(`${API}/api/admin/clients`, {
       headers: {
         Authorization: `Bearer ${token}`,
       },
@@ -61,7 +64,7 @@ useEffect(() => {
         try{
             const token = localStorage.getItem("token");
 
-            const res = await fetch("http://localhost:5000/api/admin/create-client",{
+            const res = await fetch(`${API}/api/admin/create-client`,{
                 method: "POST",
                 headers: {
                     "Content-Type": "application/json",
