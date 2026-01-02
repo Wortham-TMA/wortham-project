@@ -7,7 +7,7 @@ export const UploadToDrive = ({ clientId, onUploaded, onError }) => {
   const [progress, setProgress] = useState(0);
 
 
-  const API = import.meta.env.VITE_API_URL;
+  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
   // ✅ list states
   const [files, setFiles] = useState([]);

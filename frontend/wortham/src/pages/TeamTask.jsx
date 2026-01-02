@@ -3,7 +3,7 @@ import { UploadToDrive } from "../components/UploadToDrive";
 
 export const TeamTask = () => {
 
-const API = import.meta.env.VITE_API_URL;
+const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState(null);

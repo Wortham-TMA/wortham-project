@@ -10,7 +10,7 @@ export const AdminLogin = ({ onLoginSuccess }) => {
   const loginHandle = async (e) => {
 
 
-    const API = import.meta.env.VITE_API_URL;
+    const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
 
     e.preventDefault();
