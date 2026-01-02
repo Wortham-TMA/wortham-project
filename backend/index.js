@@ -44,6 +44,11 @@ mongoose
   .then(() => console.log("✅ MongoDB connected"))
   .catch((err) => console.error("❌ Mongo error:", err.message));
 
+  app.get("/", (req, res) => {
+  res.send("✅ Backend is running");
+});
+
+
 // test route
 app.get("/api/health", (req, res) => {
   res.json({
