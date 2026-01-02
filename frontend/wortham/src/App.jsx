@@ -28,7 +28,7 @@ import { AdminLogin } from "./pages/AdminLogin";
 import { AdminDashboard } from "./pages/AdminDashboard";
 import { TeamDashboard } from "./pages/TeamDashboard";
 import {BrowserRouter, Routes, Route, Navigate} from 'react-router-dom';
-import './app.css'
+import './App.css'
 
 export const App = () => {
   const [role, setRole] = useState(localStorage.getItem("role"));
