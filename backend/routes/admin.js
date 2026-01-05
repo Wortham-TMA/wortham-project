@@ -1,6 +1,7 @@
 // routes/admin.js
 import { Router } from "express";
 import bcrypt from "bcrypt";
+import mongoose from "mongoose";
 
 import User from "../models/User.js";
 import Client from "../models/Client.js";
@@ -24,6 +25,10 @@ const NORMAL_STAGES = [
 
 const ALLOWED_PROJECT_TYPES = ["PRODUCTION", "NORMAL"];
 
+// helper
+const isValidObjectId = (id) => mongoose.Types.ObjectId.isValid(id);
+const getUserId = (req) => req?.user?._id || req?.user?.id;
+
 // =========================================================
 // ===================== TEAM ROUTES =======================
 // =========================================================
@@ -37,7 +42,6 @@ router.post("/create-team", auth, adminOnly, async (req, res) => {
       return res.status(400).json({ ok: false, error: "All fields are required" });
     }
 
-    // prevent duplicates (User + TeamMember both)
     const existsUser = await User.findOne({ email });
     const existsTeam = await TeamMember.findOne({ email });
 
@@ -168,7 +172,6 @@ router.get("/clients", auth, adminOnly, async (req, res) => {
 // =========================================================
 
 // POST /api/admin/projects
-// ✅ accepts projectType ("PRODUCTION" | "NORMAL")
 router.post("/projects", auth, adminOnly, async (req, res) => {
   try {
     const { name, description, startDate, dueDate, clientId, teamMemberIds, projectType } = req.body;
@@ -177,13 +180,18 @@ router.post("/projects", auth, adminOnly, async (req, res) => {
       return res.status(400).json({ ok: false, error: "Project name and client are required" });
     }
 
+    if (!isValidObjectId(clientId)) {
+      return res.status(400).json({ ok: false, error: "Invalid clientId" });
+    }
+
+    // projectType normalize
     let normalizedProjectType = projectType;
     if (normalizedProjectType !== undefined && normalizedProjectType !== null && normalizedProjectType !== "") {
       if (!ALLOWED_PROJECT_TYPES.includes(normalizedProjectType)) {
         return res.status(400).json({ ok: false, error: "Invalid projectType" });
       }
     } else {
-      normalizedProjectType = undefined; // let schema default handle
+      normalizedProjectType = undefined; // schema default
     }
 
     const client = await Client.findById(clientId);
@@ -192,20 +200,26 @@ router.post("/projects", auth, adminOnly, async (req, res) => {
     // validate team members (optional)
     let validTeamIds = [];
     if (Array.isArray(teamMemberIds) && teamMemberIds.length > 0) {
-      const found = await TeamMember.find({ _id: { $in: teamMemberIds } }).select("_id");
+      const cleanIds = teamMemberIds.filter((id) => isValidObjectId(id));
+      const found = await TeamMember.find({ _id: { $in: cleanIds } }).select("_id");
       validTeamIds = found.map((m) => m._id);
     }
 
-    // IMPORTANT: do NOT send stages, schema hook will set based on projectType
+    const userId = getUserId(req);
+    if (!userId) {
+      return res.status(401).json({ ok: false, error: "Unauthorized (no user id)" });
+    }
+
+    // IMPORTANT: do NOT send stages; schema hook sets based on projectType
     const project = await Project.create({
       name,
       description,
       startDate: startDate ? new Date(startDate) : undefined,
       dueDate: dueDate ? new Date(dueDate) : undefined,
-      createdBy: req.user.id,
+      createdBy: userId, // ✅ FIXED
       client: client._id,
       teamMembers: validTeamIds,
-      projectType: normalizedProjectType, // can be undefined -> schema default
+      projectType: normalizedProjectType,
     });
 
     const populated = await Project.findById(project._id)
@@ -229,12 +243,12 @@ router.post("/projects", auth, adminOnly, async (req, res) => {
     });
   } catch (err) {
     console.error("CREATE PROJECT ERROR:", err);
-    return res.status(500).json({ ok: false, error: "Server Error" });
+    // ✅ return real message so you can see exact reason in frontend
+    return res.status(500).json({ ok: false, error: err?.message || "Server Error" });
   }
 });
 
 // POST /api/admin/projects/init-stages
-// ✅ RUN ONCEI: Backfill projectType if missing + set stages if missing/empty
 router.post("/projects/init-stages", auth, adminOnly, async (req, res) => {
   try {
     // 1) Backfill projectType if missing
@@ -252,7 +266,6 @@ router.post("/projects/init-stages", auth, adminOnly, async (req, res) => {
 
     for (const p of projectsNeedingStages) {
       const stages = p.projectType === "NORMAL" ? NORMAL_STAGES : PRODUCTION_STAGES;
-
       await Project.updateOne({ _id: p._id }, { $set: { stages } });
       updatedStagesProjects++;
     }
@@ -265,7 +278,7 @@ router.post("/projects/init-stages", auth, adminOnly, async (req, res) => {
     });
   } catch (err) {
     console.error("INIT STAGES ERROR:", err);
-    return res.status(500).json({ ok: false, error: "Server Error" });
+    return res.status(500).json({ ok: false, error: err?.message || "Server Error" });
   }
 });
 
@@ -294,16 +307,19 @@ router.get("/projects", auth, adminOnly, async (req, res) => {
     });
   } catch (err) {
     console.error("GET PROJECTS ERROR:", err);
-    return res.status(500).json({ ok: false, error: "Server Error" });
+    return res.status(500).json({ ok: false, error: err?.message || "Server Error" });
   }
 });
 
 // PATCH /api/admin/projects/:projectId/stages/:key
-// ✅ sets lastUpdatedBy + returns projectType
 router.patch("/projects/:projectId/stages/:key", auth, adminOnly, async (req, res) => {
   try {
     const { projectId, key } = req.params;
     const { stageName, timeline, status, latestUpdate } = req.body;
+
+    if (!isValidObjectId(projectId)) {
+      return res.status(400).json({ ok: false, error: "Invalid projectId" });
+    }
 
     const project = await Project.findById(projectId);
     if (!project) return res.status(404).json({ ok: false, error: "Project not found" });
@@ -331,15 +347,16 @@ router.patch("/projects/:projectId/stages/:key", auth, adminOnly, async (req, re
 
     if (typeof latestUpdate === "string") stage.latestUpdate = latestUpdate;
 
+    const userId = getUserId(req);
     stage.updatedAt = new Date();
-    stage.lastUpdatedBy = req.user.id;
+    stage.lastUpdatedBy = userId || stage.lastUpdatedBy; // ✅ FIXED
 
     await project.save();
 
     const populated = await Project.findById(project._id)
       .populate("client", "name email companyName")
       .populate("teamMembers", "name email designation")
-      .populate("stages.lastUpdatedBy", "name email"); // optional
+      .populate("stages.lastUpdatedBy", "name email");
 
     return res.json({
       ok: true,
@@ -358,7 +375,7 @@ router.patch("/projects/:projectId/stages/:key", auth, adminOnly, async (req, re
     });
   } catch (err) {
     console.error("UPDATE STAGE ERROR:", err);
-    return res.status(500).json({ ok: false, error: "Server Error" });
+    return res.status(500).json({ ok: false, error: err?.message || "Server Error" });
   }
 });
 
