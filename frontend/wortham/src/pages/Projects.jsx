@@ -4,15 +4,12 @@ import { useEffect, useMemo, useState } from "react";
 import { UploadToDrive } from "../components/UploadToDrive"; // ✅ add this
 
 export const Projects = () => {
-
-
-
   const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
-
-
-
   const [showForm, setShowForm] = useState(false);
+
+  // ✅ NEW: project type state (default PRODUCTION)
+  const [projectType, setProjectType] = useState("PRODUCTION");
 
   // form states
   const [name, setName] = useState("");
@@ -55,6 +52,8 @@ export const Projects = () => {
 
   const getProjectId = (p) => p?.id || p?._id;
 
+  const getProjectType = (p) => (p?.projectType || "PRODUCTION"); // ✅ fallback for old projects
+
   const getClientIdFromProject = (p) => {
     const c = p?.client;
     if (!c) return "";
@@ -62,7 +61,7 @@ export const Projects = () => {
   };
 
   // 🔹 Fetch team, clients, projects
-  const fetchInitialData = async () => {
+   const fetchInitialData = async () => {
     try {
       setLoadingList(true);
 
@@ -129,6 +128,9 @@ export const Projects = () => {
           startDate: startDate || undefined,
           dueDate: dueDate || undefined,
           teamMemberIds: selectedTeamIds,
+
+          // ✅ NEW
+          projectType, // "PRODUCTION" | "NORMAL"
         }),
       });
 
@@ -145,6 +147,7 @@ export const Projects = () => {
       setStartDate("");
       setDueDate("");
       setSelectedTeamIds([]);
+      setProjectType("PRODUCTION"); // ✅ reset to default
       setShowForm(false);
 
       await fetchProjectsOnly();
@@ -188,28 +191,35 @@ export const Projects = () => {
     return dt.toLocaleDateString("en-IN", { day: "numeric", month: "short", year: "numeric" });
   };
 
+  // ✅ Updated: NORMAL project me progress hide (return null)
   const calcProgress = (p) => {
+    const type = getProjectType(p);
+    if (type === "NORMAL") return null;
+
     const stages = p?.stages || [];
     if (!stages.length) return 0;
     const done = stages.filter((s) => s.status === "COMPLETED").length;
     return Math.round((done / stages.length) * 100);
   };
 
+  const getStagesCountForCard = (p) => {
+    const type = getProjectType(p);
+    if (type === "NORMAL") return 1;
+    return (p?.stages?.length || 0);
+  };
+
   const updateStage = async (projectId, stageKey, payload) => {
     try {
       setSavingStageKey(stageKey);
 
-      const res = await fetch(
-        `${API}/api/admin/projects/${projectId}/stages/${stageKey}`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        }
-      );
+      const res = await fetch(`${API}/api/admin/projects/${projectId}/stages/${stageKey}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
 
       const data = await safeJson(res);
       if (!res.ok || !data.ok) throw new Error(data.error || "Failed to update stage");
@@ -325,10 +335,7 @@ export const Projects = () => {
 
         {/* ✅ Create Project Form (MODAL OVERLAY) */}
         {showForm && (
-          <div
-            className="project-form-modal-overlay"
-            onClick={() => setShowForm(false)}
-          >
+          <div className="project-form-modal-overlay" onClick={() => setShowForm(false)}>
             <form
               className="project-form-modal"
               onClick={(e) => e.stopPropagation()}
@@ -361,6 +368,15 @@ export const Projects = () => {
                   onChange={(e) => setDescription(e.target.value)}
                   rows={3}
                 />
+
+                {/* ✅ NEW: PROJECT TYPE */}
+                <div className="project-field-group">
+                  <label>Project Type</label>
+                  <select value={projectType} onChange={(e) => setProjectType(e.target.value)}>
+                    <option value="PRODUCTION">Production Project</option>
+                    <option value="NORMAL">Normal Project</option>
+                  </select>
+                </div>
 
                 <div className="project-field-group">
                   <label>Client</label>
@@ -453,7 +469,9 @@ export const Projects = () => {
         ) : (
           <>
             {filteredProjects.map((p) => {
-              const percent = calcProgress(p);
+              const type = getProjectType(p);
+              const percent = calcProgress(p); // null for NORMAL
+              const stagesCount = getStagesCountForCard(p);
 
               return (
                 <div className="main-main-main" key={getProjectId(p)}>
@@ -505,14 +523,17 @@ export const Projects = () => {
                         </p>
                         <p>
                           <PiStackLight className="aspicon" />
-                          {(p.stages?.length || 0)} Stages
+                          {stagesCount} Stages
                         </p>
                       </div>
 
-                      <div className="project-progress">
-                        <h4>{percent}%</h4>
-                        <p>Complete</p>
-                      </div>
+                      {/* ✅ Production only progress */}
+                      {type === "PRODUCTION" && (
+                        <div className="project-progress">
+                          <h4>{percent ?? 0}%</h4>
+                          <p>Complete</p>
+                        </div>
+                      )}
                     </div>
                   </div>
                 </div>
@@ -552,12 +573,15 @@ export const Projects = () => {
                     </p>
                   )}
 
-                  {modalMsg && (
-                    <p style={{ marginTop: 8, fontSize: 13, color: "red" }}>{modalMsg}</p>
-                  )}
+                  {modalMsg && <p style={{ marginTop: 8, fontSize: 13, color: "red" }}>{modalMsg}</p>}
                 </div>
 
-                {(selectedProject.stages || []).map((s) => (
+                {/* ✅ NEW: NORMAL projects show only first stage */}
+                {(
+                  getProjectType(selectedProject) === "NORMAL"
+                    ? (selectedProject.stages || []).slice(0, 1)
+                    : (selectedProject.stages || [])
+                ).map((s) => (
                   <div className="stage-card" key={s.key}>
                     <div className="stage-top">
                       <div className="stage-col">
@@ -569,7 +593,7 @@ export const Projects = () => {
                             const v = e.target.value;
                             setSelectedProject((prev) => ({
                               ...prev,
-                              stages: prev.stages.map((x) =>
+                              stages: (prev.stages || []).map((x) =>
                                 x.key === s.key ? { ...x, stageName: v } : x
                               ),
                             }));
@@ -590,7 +614,7 @@ export const Projects = () => {
                             const v = e.target.value;
                             setSelectedProject((prev) => ({
                               ...prev,
-                              stages: prev.stages.map((x) =>
+                              stages: (prev.stages || []).map((x) =>
                                 x.key === s.key ? { ...x, timeline: v } : x
                               ),
                             }));
@@ -611,7 +635,7 @@ export const Projects = () => {
                             const status = e.target.value;
                             setSelectedProject((prev) => ({
                               ...prev,
-                              stages: prev.stages.map((x) =>
+                              stages: (prev.stages || []).map((x) =>
                                 x.key === s.key ? { ...x, status } : x
                               ),
                             }));
@@ -635,7 +659,7 @@ export const Projects = () => {
                           const v = e.target.value;
                           setSelectedProject((prev) => ({
                             ...prev,
-                            stages: prev.stages.map((x) =>
+                            stages: (prev.stages || []).map((x) =>
                               x.key === s.key ? { ...x, latestUpdate: v } : x
                             ),
                           }));

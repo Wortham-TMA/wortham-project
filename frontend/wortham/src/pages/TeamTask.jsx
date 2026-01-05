@@ -2,8 +2,7 @@ import { useEffect, useMemo, useState } from "react";
 import { UploadToDrive } from "../components/UploadToDrive";
 
 export const TeamTask = () => {
-
-const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
   const [projects, setProjects] = useState([]);
   const [selectedProject, setSelectedProject] = useState(null);
@@ -69,17 +68,14 @@ const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
       setSavingStageKey(key);
 
       const token = getToken();
-      const res = await fetch(
-        `${API}/api/team/projects/${projectId}/stages/${key}`,
-        {
-          method: "PATCH",
-          headers: {
-            "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
-          },
-          body: JSON.stringify(payload),
-        }
-      );
+      const res = await fetch(`${API}/api/team/projects/${projectId}/stages/${key}`, {
+        method: "PATCH",
+        headers: {
+          "Content-Type": "application/json",
+          Authorization: `Bearer ${token}`,
+        },
+        body: JSON.stringify(payload),
+      });
 
       const data = await safeJson(res);
       if (!res.ok || !data.ok) throw new Error(data.error || "Update failed");
@@ -161,8 +157,10 @@ const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
               <p>
                 <b>Due:</b> {p.dueDate ? new Date(p.dueDate).toDateString() : "—"}
               </p>
+
+              {/* ✅ UPDATED: NORMAL -> 1 stage */}
               <p>
-                <b>Stages:</b> {p.stages?.length || 0}
+                <b>Stages:</b> {p.projectType === "NORMAL" ? 1 : (p.stages?.length || 0)}
               </p>
             </div>
           ))}
@@ -222,7 +220,7 @@ const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
               <UploadToDrive
                 clientId={getClientId(selectedProject)}
                 onUploaded={(file) => setUploadedInfo(file)}
-                onError={(e) => setModalMsg(e)} // ✅ modal msg only
+                onError={(e) => setModalMsg(e)}
               />
 
               {uploadedInfo?.webViewLink && (
@@ -234,12 +232,15 @@ const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
                 </p>
               )}
 
-              {modalMsg && (
-                <p style={{ marginTop: 8, fontSize: 13, color: "red" }}>{modalMsg}</p>
-              )}
+              {modalMsg && <p style={{ marginTop: 8, fontSize: 13, color: "red" }}>{modalMsg}</p>}
             </div>
 
-            {(selectedProject.stages || []).map((s) => (
+            {/* ✅ UPDATED: NORMAL -> show only 1 stage */}
+            {(
+              selectedProject?.projectType === "NORMAL"
+                ? (selectedProject.stages || []).slice(0, 1)
+                : (selectedProject.stages || [])
+            ).map((s) => (
               <div
                 key={s.key}
                 style={{
@@ -249,7 +250,6 @@ const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
                   marginTop: 12,
                 }}
               >
-                {/* 🔒 STAGE NAME (READ ONLY) */}
                 <p style={{ margin: 0, fontSize: 12, opacity: 0.7 }}>STAGE NAME</p>
                 <input
                   value={s.stageName || ""}
@@ -264,7 +264,6 @@ const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
                   }}
                 />
 
-                {/* 🔒 TIMELINE (READ ONLY) */}
                 <p style={{ marginTop: 12, marginBottom: 0, fontSize: 12, opacity: 0.7 }}>
                   TIMELINE
                 </p>
@@ -282,7 +281,6 @@ const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
                   }}
                 />
 
-                {/* ✅ STATUS (EDITABLE) */}
                 <p style={{ marginTop: 12, marginBottom: 0, fontSize: 12, opacity: 0.7 }}>
                   STATUS
                 </p>
@@ -307,7 +305,6 @@ const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
                   <option value="COMPLETED">COMPLETED</option>
                 </select>
 
-                {/* ✅ LATEST UPDATE (EDITABLE) */}
                 <p style={{ marginTop: 12, marginBottom: 0, fontSize: 12, opacity: 0.7 }}>
                   LATEST UPDATE
                 </p>
@@ -323,7 +320,6 @@ const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
                     }));
                   }}
                   onBlur={() => {
-                    // ✅ always take latest value from state at blur time
                     const latest =
                       selectedProject?.stages?.find((x) => x.key === s.key)?.latestUpdate || "";
                     updateStage(getProjectId(selectedProject), s.key, { latestUpdate: latest });
