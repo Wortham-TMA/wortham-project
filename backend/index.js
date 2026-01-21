@@ -23,7 +23,7 @@ console.log("ENV CHECK REDIRECT:", process.env.GOOGLE_OAUTH_REDIRECT_URI);
 
 
 const app = express();
-app.use("/api/client", clientRoutes);
+
 
 // Middlewares 
 
@@ -64,6 +64,7 @@ app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/team", teamRoutes);
 app.use("/api/files", filesRoutes);
+app.use("/api/client", clientRoutes);
 
 
 console.log("CREDS PATH:", process.env.GOOGLE_APPLICATION_CREDENTIALS);
