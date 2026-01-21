@@ -8,6 +8,8 @@ import { Readable } from "stream";
 import { auth } from "../middleware/auth.js";
 import Client from "../models/Client.js";
 import OAuthToken from "../models/OAuthToken.js";
+import ProjectFile from "../models/ProjectFile.js"; // ⬅️ import at top
+
 
 dotenv.config();
 const router = Router();
@@ -92,50 +94,107 @@ router.get("/google/callback", async (req, res) => {
 });
 
 // ✅ 3) UPLOAD FILE (to client's folderId)
+// router.post("/upload/:clientId", auth, upload.single("file"), async (req, res) => {
+//   try {
+//     if (!req.file) return res.status(400).json({ ok: false, error: "file required" });
+
+//     const client = await Client.findById(req.params.clientId);
+//     if (!client?.googleDriveFolderId) {
+//       return res.status(400).json({ ok: false, error: "Client Drive folderId missing" });
+//     }
+
+//     // ✅ tokens load
+//     const saved = await OAuthToken.findOne({ ownerId: req.user.id });
+//     if (!saved?.tokens) {
+//       return res.status(401).json({ ok: false, error: "Google not connected. Connect first." });
+//     }
+
+//     const oauth2Client = getOAuthClient();
+//     oauth2Client.setCredentials(saved.tokens);
+
+//     const drive = google.drive({ version: "v3", auth: oauth2Client });
+
+//     const fileMetadata = {
+//       name: req.file.originalname,
+//       parents: [client.googleDriveFolderId],
+//     };
+
+//     // ✅ IMPORTANT FIX: body must be a stream (NOT Buffer)
+//     const media = {
+//       mimeType: req.file.mimetype,
+//       body: Readable.from(req.file.buffer),
+//     };
+
+//     const resp = await drive.files.create({
+//       requestBody: fileMetadata,
+//       media,
+//       fields: "id, name, webViewLink, webContentLink, parents",
+//       supportsAllDrives: true, // shared drive support
+//     });
+
+//     return res.json({ ok: true, file: resp.data });
+//   } catch (err) {
+//     console.error("UPLOAD ERROR:", err);
+//     return res.status(500).json({ ok: false, error: err.message || "Server Error" });
+//   }
+// });
+
+
+
+
+
 router.post("/upload/:clientId", auth, upload.single("file"), async (req, res) => {
   try {
-    if (!req.file) return res.status(400).json({ ok: false, error: "file required" });
+    if (!req.file) {
+      return res.status(400).json({ ok: false, error: "file required" });
+    }
 
+    // client find
     const client = await Client.findById(req.params.clientId);
     if (!client?.googleDriveFolderId) {
-      return res.status(400).json({ ok: false, error: "Client Drive folderId missing" });
+      return res
+        .status(400)
+        .json({ ok: false, error: "Client Drive folderId missing" });
     }
 
-    // ✅ tokens load
-    const saved = await OAuthToken.findOne({ ownerId: req.user.id });
-    if (!saved?.tokens) {
-      return res.status(401).json({ ok: false, error: "Google not connected. Connect first." });
-    }
-
-    const oauth2Client = getOAuthClient();
-    oauth2Client.setCredentials(saved.tokens);
-
-    const drive = google.drive({ version: "v3", auth: oauth2Client });
-
-    const fileMetadata = {
-      name: req.file.originalname,
-      parents: [client.googleDriveFolderId],
-    };
-
-    // ✅ IMPORTANT FIX: body must be a stream (NOT Buffer)
-    const media = {
-      mimeType: req.file.mimetype,
-      body: Readable.from(req.file.buffer),
-    };
-
+    // upload to drive
     const resp = await drive.files.create({
-      requestBody: fileMetadata,
-      media,
-      fields: "id, name, webViewLink, webContentLink, parents",
-      supportsAllDrives: true, // shared drive support
+      requestBody: {
+        name: req.file.originalname,
+        parents: [client.googleDriveFolderId],
+      },
+      media: {
+        mimeType: req.file.mimetype,
+        body: Buffer.from(req.file.buffer),
+      },
+      fields: "id, name, webViewLink",
+      supportsAllDrives: true,
     });
 
-    return res.json({ ok: true, file: resp.data });
+    // ✅ YAHAN ADD KARNA HAI (IMPORTANT)
+    await ProjectFile.create({
+      project: req.body.projectId,   // frontend se bhejna
+      uploadedBy: req.user.id,
+      uploadedByRole: req.user.role, // CLIENT / ADMIN / TEAM_MEMBER
+      fileName: resp.data.name,
+      driveFileId: resp.data.id,
+      driveLink: resp.data.webViewLink,
+      remark: "",
+    });
+
+    return res.json({
+      ok: true,
+      file: resp.data,
+    });
   } catch (err) {
     console.error("UPLOAD ERROR:", err);
-    return res.status(500).json({ ok: false, error: err.message || "Server Error" });
+    return res.status(500).json({ ok: false, error: err.message });
   }
 });
+
+
+
+
 
 // ✅ LIST FILES IN CLIENT FOLDER
 router.get("/list/:clientId", auth, async (req, res) => {

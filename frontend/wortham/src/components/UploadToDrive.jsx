@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 
-export const UploadToDrive = ({ clientId, onUploaded, onError }) => {
+export const UploadToDrive = ({ clientId, project, onUploaded, onError }) => {
   const [file, setFile] = useState(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
@@ -97,6 +97,7 @@ export const UploadToDrive = ({ clientId, onUploaded, onError }) => {
 
       const fd = new FormData();
       fd.append("file", file);
+      fd.append("projectId", project._id);
 
       await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();

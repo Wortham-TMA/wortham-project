@@ -6,6 +6,11 @@ import authRoutes from './routes/auth.js';
 import adminRoutes from './routes/admin.js';
 import teamRoutes from './routes/team.js';
 import filesRoutes from "./routes/files.js";
+import clientRoutes from "./routes/client.js";
+
+
+
+
 
 
 dotenv.config();
@@ -18,6 +23,7 @@ console.log("ENV CHECK REDIRECT:", process.env.GOOGLE_OAUTH_REDIRECT_URI);
 
 
 const app = express();
+app.use("/api/client", clientRoutes);
 
 // Middlewares 
 

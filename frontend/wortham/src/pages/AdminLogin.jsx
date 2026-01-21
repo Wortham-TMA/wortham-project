@@ -7,53 +7,106 @@ export const AdminLogin = ({ onLoginSuccess }) => {
   const [error, setError] = useState("");
   const [loading, setLoading] = useState(false); // ✅ boolean
 
+  // const loginHandle = async (e) => {
+
+
+  //   const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+
+  //   e.preventDefault();
+  //   setError("");
+  //   setLoading(true);
+
+  //   try {
+  //     const res = await fetch(`${API}/api/auth/login`, {
+  //       method: "POST",
+  //       headers: { "Content-Type": "application/json" },
+  //       body: JSON.stringify({ email, password }),
+  //     });
+
+  //     const data = await res.json();
+
+  //     if (!res.ok || !data.ok) {
+  //       throw new Error(data.error || "Login failed");
+  //     }
+
+  //     const user = data.user || data.admin || {};
+  //     if (!data.token) throw new Error("Token missing from response");
+  //     if (!user.role) throw new Error("Role missing from response");
+
+  //     // ✅ save token + role
+  //     localStorage.setItem("token", data.token);
+  //     localStorage.setItem("role", user.role);
+  //     if (user.name) localStorage.setItem("name", user.name);
+
+  //     // ✅ Only allow ADMIN or TEAM_MEMBER (client ko abhi block)
+  //     if (user.role !== "ADMIN" && user.role !== "TEAM_MEMBER") {
+  //       throw new Error("Access not allowed for this portal");
+  //     }
+
+  //     // ✅ parent ko role bhejo
+  //     if (typeof onLoginSuccess === "function") {
+  //       onLoginSuccess(user.role);
+  //     }
+  //   } catch (err) {
+  //     setError(err.message || "Login Failed");
+  //   } finally {
+  //     setLoading(false);
+  //   }
+  // };
+
+
+
+
   const loginHandle = async (e) => {
+  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
 
+  e.preventDefault();
+  setError("");
+  setLoading(true);
 
-    const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+  try {
+    const res = await fetch(`${API}/api/auth/login`, {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ email, password }),
+    });
 
+    const data = await res.json();
 
-    e.preventDefault();
-    setError("");
-    setLoading(true);
-
-    try {
-      const res = await fetch(`${API}/api/auth/login`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-        body: JSON.stringify({ email, password }),
-      });
-
-      const data = await res.json();
-
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error || "Login failed");
-      }
-
-      const user = data.user || data.admin || {};
-      if (!data.token) throw new Error("Token missing from response");
-      if (!user.role) throw new Error("Role missing from response");
-
-      // ✅ save token + role
-      localStorage.setItem("token", data.token);
-      localStorage.setItem("role", user.role);
-      if (user.name) localStorage.setItem("name", user.name);
-
-      // ✅ Only allow ADMIN or TEAM_MEMBER (client ko abhi block)
-      if (user.role !== "ADMIN" && user.role !== "TEAM_MEMBER") {
-        throw new Error("Access not allowed for this portal");
-      }
-
-      // ✅ parent ko role bhejo
-      if (typeof onLoginSuccess === "function") {
-        onLoginSuccess(user.role);
-      }
-    } catch (err) {
-      setError(err.message || "Login Failed");
-    } finally {
-      setLoading(false);
+    if (!res.ok || !data.ok) {
+      throw new Error(data.error || "Login failed");
     }
-  };
+
+    const user = data.user || data.admin || {};
+    if (!data.token) throw new Error("Token missing from response");
+    if (!user.role) throw new Error("Role missing from response");
+
+    // ✅ save token + role
+    localStorage.setItem("token", data.token);
+    localStorage.setItem("role", user.role);
+    if (user.name) localStorage.setItem("name", user.name);
+
+    // ✅ allow ADMIN / TEAM / CLIENT
+    const allowedRoles = ["ADMIN", "TEAM_MEMBER", "CLIENT"];
+    if (!allowedRoles.includes(user.role)) {
+      throw new Error("Invalid user role");
+    }
+
+    // ✅ parent ko role bhejo
+    if (typeof onLoginSuccess === "function") {
+      onLoginSuccess(user.role);
+    }
+  } catch (err) {
+    setError(err.message || "Login Failed");
+  } finally {
+    setLoading(false);
+  }
+};
+
+
+
+
 
   return (
     <div className="login-first">

@@ -98,53 +98,117 @@ router.get("/teams", auth, adminOnly, async (req, res)=>{
 
 // Route to create Client
 
-router.post("/create-client", auth, adminOnly, async (req, res)=>{
+// router.post("/create-client", auth, adminOnly, async (req, res)=>{
 
-try{
+// try{
 
-    const {name, email, companyName, googleDriveFolderId, creditBalance, clientType} = req.body;
+//     const {name, email, companyName, googleDriveFolderId, creditBalance, clientType} = req.body;
 
 
-    if(!name || !email){
-        return res.status(400).json({error: "Name and email are required"})
-    };
+//     if(!name || !email){
+//         return res.status(400).json({error: "Name and email are required"})
+//     };
 
-    const exists = await Client.findOne({email});
+//     const exists = await Client.findOne({email});
 
-    if(exists){
-        return res.status(400).json({error: "Client with this email already exists"});
+//     if(exists){
+//         return res.status(400).json({error: "Client with this email already exists"});
+//     }
+
+//     const client = await Client.create({
+//         name,
+//         email,
+//         companyName,
+//         clientType,
+//         googleDriveFolderId,
+//         creditBalance: creditBalance || 0
+//         });
+
+//     res.json({
+//         ok: true,
+//         Client:{
+//             id: client._id,
+//             name: client.name,
+//             email: client.email,
+//             clientType: client.clientType,
+//             companyName: client.companyName,
+//             googleDriveFolderId: client.googleDriveFolderId,
+//             creditBalance: client.creditBalance,
+//         },
+//     });
+// } catch (err){
+//     console.error("create-client error:", err);
+//      console.error(err.errors);
+//     res.status(500).json({error: "Server Error"});
+// }
+
+
+
+// });
+
+router.post("/create-client", auth, adminOnly, async (req, res) => {
+  try {
+    const {
+      name,
+      email,
+      companyName,
+      googleDriveFolderId,
+      creditBalance,
+      clientType,
+    } = req.body;
+
+    if (!name || !email) {
+      return res.status(400).json({ error: "Name and email are required" });
     }
 
-    const client = await Client.create({
-        name,
-        email,
-        companyName,
-        clientType,
-        googleDriveFolderId,
-        creditBalance: creditBalance || 0
-        });
+    const existingClient = await Client.findOne({ email });
+    if (existingClient) {
+      return res.status(400).json({ error: "Client already exists" });
+    }
 
-    res.json({
-        ok: true,
-        Client:{
-            id: client._id,
-            name: client.name,
-            email: client.email,
-            clientType: client.clientType,
-            companyName: client.companyName,
-            googleDriveFolderId: client.googleDriveFolderId,
-            creditBalance: client.creditBalance,
-        },
+    const existingUser = await User.findOne({ email });
+    if (existingUser) {
+      return res.status(400).json({ error: "User already exists" });
+    }
+
+    // 🔐 AUTO PASSWORD from client name
+    const rawName = name.toLowerCase().replace(/\s+/g, "");
+    const defaultPassword = `${rawName}@wortham#123`;
+
+    const passwordHash = await bcrypt.hash(defaultPassword, 10);
+
+    const user = await User.create({
+      name,
+      email,
+      passwordHash,
+      role: "CLIENT",
     });
-} catch (err){
+
+    const client = await Client.create({
+      name,
+      email,
+      companyName,
+      clientType,
+      googleDriveFolderId,
+      creditBalance: creditBalance || 0,
+      user: user._id,
+    });
+
+    return res.json({
+      ok: true,
+      message: "Client created successfully",
+      loginCredentials: {
+        email,
+        password: defaultPassword, // ⚠️ show once
+      },
+      client,
+    });
+  } catch (err) {
     console.error("create-client error:", err);
-     console.error(err.errors);
-    res.status(500).json({error: "Server Error"});
-}
-
-
-
+    res.status(500).json({ error: "Server Error" });
+  }
 });
+
 
 
 // Route to fetch data of clients 
@@ -277,10 +341,7 @@ router.post("/projects/init-stages", auth, adminOnly, async (req, res) => {
 });
 
 
-
-
 // Get Project List 
-
 
 // GET ALL PROJECTS (admin only)
 router.get("/projects", auth, adminOnly, async (req, res) => {

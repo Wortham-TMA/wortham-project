@@ -1,38 +1,60 @@
-
+// import { useEffect, useState } from "react";
+// import { AdminLogin } from "./pages/AdminLogin";
+// import { AdminDashboard } from "./pages/AdminDashboard";
+// import { TeamDashboard } from "./pages/TeamDashboard";
+// import {BrowserRouter, Routes, Route, Navigate} from 'react-router-dom';
+// import './App.css'
 
 // export const App = () => {
+//   const [role, setRole] = useState(localStorage.getItem("role"));
+//   const [token, setToken] = useState(localStorage.getItem("token"));
 
+//   const isLoggedIn = !!token;
 
-//   const [isLoggedIn, SetLoggedIn] = useState(
-//     !!localStorage.getItem("token")
+//   const logout = () => {
+//     localStorage.removeItem("token");
+//     localStorage.removeItem("role");
+//     setToken(null);
+//     setRole(null);
+//   };
+
+//   if (!isLoggedIn) {
+//     return (
+//       <AdminLogin
+//         onLoginSuccess={(userRole) => {
+//           setToken(localStorage.getItem("token"));
+//           setRole(userRole);
+//         }}
+//       />
+//     );
+//   }
+
+//   if (role === "ADMIN") return <AdminDashboard onLogout={logout} />;
+//   if (role === "TEAM_MEMBER") return <TeamDashboard onLogout={logout} />;
+
+//   return (
+//     <div>
+//       <p>Unauthorized role: {role}</p>
+//       <button onClick={logout}>Logout</button>
+//     </div>
 //   );
-
-
-//   return<>
-
-
-//       {isLoggedIn ? (
-//         <AdminDashboard onLogout={()=> SetLoggedIn(false)}/>
-//       ):(
-//         <AdminLogin onLoginSuccess={()=> SetLoggedIn(true)}/>
-//       )}
-//   </>
-
-
-// }
+// };
 
 
 
-import { useEffect, useState } from "react";
+import { useState } from "react";
+import { BrowserRouter, Routes, Route, Navigate } from "react-router-dom";
+
 import { AdminLogin } from "./pages/AdminLogin";
 import { AdminDashboard } from "./pages/AdminDashboard";
 import { TeamDashboard } from "./pages/TeamDashboard";
-import {BrowserRouter, Routes, Route, Navigate} from 'react-router-dom';
-import './App.css'
+import { ClientDashboard } from "./pages/ClientDashboard"; // 👈 create this page
+
+import "./App.css";
 
 export const App = () => {
-  const [role, setRole] = useState(localStorage.getItem("role"));
   const [token, setToken] = useState(localStorage.getItem("token"));
+  const [role, setRole] = useState(localStorage.getItem("role"));
 
   const isLoggedIn = !!token;
 
@@ -43,24 +65,74 @@ export const App = () => {
     setRole(null);
   };
 
-  if (!isLoggedIn) {
-    return (
-      <AdminLogin
-        onLoginSuccess={(userRole) => {
-          setToken(localStorage.getItem("token"));
-          setRole(userRole);
-        }}
-      />
-    );
-  }
-
-  if (role === "ADMIN") return <AdminDashboard onLogout={logout} />;
-  if (role === "TEAM_MEMBER") return <TeamDashboard onLogout={logout} />;
+  // 🔒 Private Route Wrapper
+  const PrivateRoute = ({ allowedRoles, children }) => {
+    if (!isLoggedIn) return <Navigate to="/" />;
+    if (!allowedRoles.includes(role)) return <Navigate to="/" />;
+    return children;
+  };
 
   return (
-    <div>
-      <p>Unauthorized role: {role}</p>
-      <button onClick={logout}>Logout</button>
-    </div>
+    <BrowserRouter>
+      <Routes>
+        {/* LOGIN */}
+        <Route
+          path="/"
+          element={
+            isLoggedIn ? (
+              role === "ADMIN" ? (
+                <Navigate to="/admin" />
+              ) : role === "TEAM_MEMBER" ? (
+                <Navigate to="/team" />
+              ) : role === "CLIENT" ? (
+                <Navigate to="/client" />
+              ) : (
+                <Navigate to="/" />
+              )
+            ) : (
+              <AdminLogin
+                onLoginSuccess={(userRole) => {
+                  setToken(localStorage.getItem("token"));
+                  setRole(userRole);
+                }}
+              />
+            )
+          }
+        />
+
+        {/* ADMIN */}
+        <Route
+          path="/admin"
+          element={
+            <PrivateRoute allowedRoles={["ADMIN"]}>
+              <AdminDashboard onLogout={logout} />
+            </PrivateRoute>
+          }
+        />
+
+        {/* TEAM */}
+        <Route
+          path="/team"
+          element={
+            <PrivateRoute allowedRoles={["TEAM_MEMBER"]}>
+              <TeamDashboard onLogout={logout} />
+            </PrivateRoute>
+          }
+        />
+
+        {/* CLIENT */}
+        <Route
+          path="/client"
+          element={
+            <PrivateRoute allowedRoles={["CLIENT"]}>
+              <ClientDashboard onLogout={logout} />
+            </PrivateRoute>
+          }
+        />
+
+        {/* FALLBACK */}
+        <Route path="*" element={<Navigate to="/" />} />
+      </Routes>
+    </BrowserRouter>
   );
 };
