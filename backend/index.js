@@ -71,34 +71,33 @@ const app = express();
 //   })
 // );
 
+
+const allowedOrigins = [
+  "http://localhost:5173",
+  "http://localhost:3000",
+  /\.vercel\.app$/,
+];
+
 app.use(
   cors({
-    origin: function (origin, callback) {
+    origin: (origin, callback) => {
       if (!origin) return callback(null, true);
 
-      const allowedOrigins = [
-        "http://localhost:5173",
-        "http://localhost:3000",
-        /\.vercel\.app$/,
-      ];
+      const allowed = allowedOrigins.some((o) =>
+        o instanceof RegExp ? o.test(origin) : o === origin
+      );
 
-      if (
-        allowedOrigins.some((o) =>
-          o instanceof RegExp ? o.test(origin) : o === origin
-        )
-      ) {
-        callback(null, true);
-      } else {
-        callback(new Error("Not allowed by CORS"));
-      }
+      if (allowed) callback(null, true);
+      else callback(new Error("Not allowed by CORS"));
     },
     credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH", "OPTIONS"],
+    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
     allowedHeaders: ["Content-Type", "Authorization"],
   })
 );
 
-app.options("/*", cors());
+
+// app.options("/*", cors());
 // app.use(express.json());
 
 
