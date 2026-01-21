@@ -33,7 +33,7 @@ export const ClientProjectDetails = ({ project, onClose }) => {
 
       {/* 🔹 STAGES */}
       <h3>Project Stages</h3>
-      {project.stages.map((s) => (
+      {project.stages?.map((s) => (
         <div key={s.key} style={{ marginBottom: 8 }}>
           <strong>{s.stageName}</strong> — {s.status}
         </div>

@@ -18,7 +18,7 @@ router.get("/projects", auth, clientOnly, async (req, res) => {
   const client = await Client.findOne({ user: req.user.id });
   if (!client) return res.status(404).json({ error: "Client not found" });
 
-  const projects = await Project.find({ client: client._id })
+  const projects = await Project.find({ clientId: client._id })
     .populate("teamMembers", "name")
     .lean();
 

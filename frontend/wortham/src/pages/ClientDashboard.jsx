@@ -8,15 +8,26 @@ export const ClientDashboard = ({ onLogout }) => {
   const [projects, setProjects] = useState([]);
   const [activeProject, setActiveProject] = useState(null);
 
+  // useEffect(() => {
+  //   fetch(`${API}/api/client/projects`, {
+  //     headers: {
+  //       Authorization: `Bearer ${token}`,
+  //     },
+  //   })
+  //     .then((r) => r.json())
+  //     .then((d) => setProjects(d.projects || []));
+  // }, []);
+
+
   useEffect(() => {
-    fetch(`${API}/api/client/projects`, {
-      headers: {
-        Authorization: `Bearer ${token}`,
-      },
-    })
-      .then((r) => r.json())
-      .then((d) => setProjects(d.projects || []));
-  }, []);
+  if (!token) return;
+
+  fetch(`${API}/api/client/projects`, {
+    headers: { Authorization: `Bearer ${token}` },
+  })
+    .then((r) => r.json())
+    .then((d) => setProjects(d.projects || []));
+}, [API, token]);
 
   return (
     <div style={{ padding: 20 }}>
