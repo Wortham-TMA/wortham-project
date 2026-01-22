@@ -1,131 +1,57 @@
-import express from  'express'
-import cors from 'cors'
-import dotenv from 'dotenv'
-import mongoose from 'mongoose'
-import authRoutes from './routes/auth.js';
-import adminRoutes from './routes/admin.js';
-import teamRoutes from './routes/team.js';
+import express from "express";
+import cors from "cors";
+import dotenv from "dotenv";
+import mongoose from "mongoose";
+
+import authRoutes from "./routes/auth.js";
+import adminRoutes from "./routes/admin.js";
+import teamRoutes from "./routes/team.js";
 import filesRoutes from "./routes/files.js";
 import clientRoutes from "./routes/client.js";
 
-
-
-
-
-
 dotenv.config();
-
-console.log("CLIENT_ID VALUE:", process.env.GOOGLE_OAUTH_CLIENT_ID);
-
-
-console.log("ENV CHECK CLIENT ID:", process.env.GOOGLE_OAUTH_CLIENT_ID);
-console.log("ENV CHECK REDIRECT:", process.env.GOOGLE_OAUTH_REDIRECT_URI);
-
 
 const app = express();
 
+/* ---------- CORS (simple & correct) ---------- */
+app.use(
+  cors({
+    origin: [
+      "http://localhost:5173",
+      "https://wortham-project.vercel.app",
+    ],
+    methods: ["GET", "POST", "PUT", "PATCH", "DELETE", "OPTIONS"],
+    allowedHeaders: ["Content-Type", "Authorization"],
+  })
+);
 
-// Middlewares 
-
-// app.use(cors());
-
-
-// const allowedOrigins = [
-//   "http://localhost:5173",
-//   "http://localhost:3000",
-//   "https://wortham-project.vercel.app",
-//   /\.vercel\.app$/ 
-// ];
-
-// app.use(
-//   cors({
-//     // origin: function (origin, callback) {
-//     //   // allow server-to-server or Postman
-//     //   if (!origin) return callback(null, true);
-
-//     //   if (allowedOrigins.includes(origin)) {
-//     //     callback(null, true);
-//     //   } else {
-//     //     callback(new Error("Not allowed by CORS"));
-//     //   }
-//     // },
-    
-//     origin: function (origin, callback) {
-//   if (!origin) return callback(null, true);
-
-//   if (
-//     allowedOrigins.some((o) =>
-//       o instanceof RegExp ? o.test(origin) : o === origin
-//     )
-//   ) {
-//     callback(null, true);
-//   } else {
-//     callback(new Error("Not allowed by CORS"));
-//   }
-// },
-    
-    
-//     credentials: true,
-//     methods: ["GET", "POST", "PUT", "DELETE", "OPTIONS"],
-//     allowedHeaders: ["Content-Type", "Authorization"],
-//   })
-// );
-
-
-const allowedOrigins = [
-  "http://localhost:5173",
-  "http://localhost:3000",
-  /\.vercel\.app$/,
-];
-
-
-
-
-// app.options("/*", cors());
-// app.use(express.json());
-
-
-
-
-// app.use(cors(...));
-// app.options("*", cors());
+/* ---------- Middlewares ---------- */
 app.use(express.json());
+
+/* ---------- Routes ---------- */
 app.use("/api/auth", authRoutes);
 app.use("/api/admin", adminRoutes);
 app.use("/api/team", teamRoutes);
 app.use("/api/files", filesRoutes);
 app.use("/api/client", clientRoutes);
 
-
-console.log("CREDS PATH:", process.env.GOOGLE_APPLICATION_CREDENTIALS);
-console.log("CREDS JSON exists?:", !!process.env.GOOGLE_SERVICE_ACCOUNT_JSON);
-
-
-// DB Connection 
-
-
-const MONGODB_URI = process.env.MONGODB_URI
-
-
-mongoose
-  .connect(MONGODB_URI, { dbName: "studio-app" })
-  .then(() => console.log("✅ MongoDB connected"))
-  .catch((err) => console.error("❌ Mongo error:", err.message));
-
-  app.get("/", (req, res) => {
+/* ---------- Health ---------- */
+app.get("/", (req, res) => {
   res.send("✅ Backend is running");
 });
 
-
-// test route
 app.get("/api/health", (req, res) => {
-  res.json({
-    ok: true,
-    message: "Backend running",
-  });
+  res.json({ ok: true });
 });
 
+/* ---------- DB ---------- */
+mongoose
+  .connect(process.env.MONGODB_URI, { dbName: "studio-app" })
+  .then(() => console.log("✅ MongoDB connected"))
+  .catch((err) => console.error("❌ Mongo error:", err.message));
+
+/* ---------- Server ---------- */
 const PORT = process.env.PORT || 5000;
 app.listen(PORT, () => {
-  console.log(`🚀 Server listening on port ${PORT}`);
+  console.log(`🚀 Server running on port ${PORT}`);
 });
