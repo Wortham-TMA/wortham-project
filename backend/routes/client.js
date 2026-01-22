@@ -13,9 +13,8 @@ const clientOnly = (req, res, next) => {
   next();
 };
 
-// ✅ Client projects
 router.get("/projects", auth, clientOnly, async (req, res) => {
-  const client = await Client.findOne({ email: req.user.email });
+  const client = await Client.findOne({ user: req.user.id });
 
   if (!client) {
     return res.status(404).json({ error: "Client not found" });
