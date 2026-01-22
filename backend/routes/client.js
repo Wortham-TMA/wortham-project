@@ -14,16 +14,39 @@ const clientOnly = (req, res, next) => {
 };
 
 // ✅ Client projects
+// router.get("/projects", auth, clientOnly, async (req, res) => {
+//   const client = await Client.findOne({ user: req.user.id });
+//   if (!client) return res.status(404).json({ error: "Client not found" });
+
+//   const projects = await Project.find({ clientId: client._id })
+//     .populate("teamMembers", "name")
+//     .lean();
+
+//   res.json({ ok: true, projects });
+// });
+
 router.get("/projects", auth, clientOnly, async (req, res) => {
-  const client = await Client.findOne({ user: req.user.id });
-  if (!client) return res.status(404).json({ error: "Client not found" });
+  try {
+    // ✅ Client find by email (correct)
+    const client = await Client.findOne({ email: req.user.email });
 
-  const projects = await Project.find({ clientId: client._id })
-    .populate("teamMembers", "name")
-    .lean();
+    if (!client) {
+      return res.status(404).json({ error: "Client not found" });
+    }
 
-  res.json({ ok: true, projects });
+    // ✅ Correct project field: client (not clientId)
+    const projects = await Project.find({ client: client._id })
+      .populate("teamMembers", "name")
+      .lean();
+
+    res.json({ ok: true, projects });
+  } catch (err) {
+    console.error("CLIENT PROJECT ERROR:", err);
+    res.status(500).json({ error: "Server error" });
+  }
 });
+
+
 
 // ✅ Files + remarks for a project
 router.get("/projects/:projectId/files", auth, clientOnly, async (req, res) => {
