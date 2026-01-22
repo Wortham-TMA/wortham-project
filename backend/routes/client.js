@@ -13,42 +13,22 @@ const clientOnly = (req, res, next) => {
   next();
 };
 
-// ✅ Client projects
-// router.get("/projects", auth, clientOnly, async (req, res) => {
-//   const client = await Client.findOne({ user: req.user.id });
-//   if (!client) return res.status(404).json({ error: "Client not found" });
-
-//   const projects = await Project.find({ clientId: client._id })
-//     .populate("teamMembers", "name")
-//     .lean();
-
-//   res.json({ ok: true, projects });
-// });
-
+// ✅ Client projects (FIXED)
 router.get("/projects", auth, clientOnly, async (req, res) => {
-  try {
-    // ✅ Client find by email (correct)
-    const client = await Client.findOne({ email: req.user.email });
+  const client = await Client.findOne({ email: req.user.email });
 
-    if (!client) {
-      return res.status(404).json({ error: "Client not found" });
-    }
-
-    // ✅ Correct project field: client (not clientId)
-    const projects = await Project.find({ client: client._id })
-      .populate("teamMembers", "name")
-      .lean();
-
-    res.json({ ok: true, projects });
-  } catch (err) {
-    console.error("CLIENT PROJECT ERROR:", err);
-    res.status(500).json({ error: "Server error" });
+  if (!client) {
+    return res.status(404).json({ error: "Client not found" });
   }
+
+  const projects = await Project.find({ clientId: client._id })
+    .populate("teamMembers", "name")
+    .lean();
+
+  res.json({ ok: true, projects });
 });
 
-
-
-// ✅ Files + remarks for a project
+// ✅ Files
 router.get("/projects/:projectId/files", auth, clientOnly, async (req, res) => {
   const files = await ProjectFile.find({
     project: req.params.projectId,
