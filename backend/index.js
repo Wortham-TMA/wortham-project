@@ -78,23 +78,7 @@ const allowedOrigins = [
   /\.vercel\.app$/,
 ];
 
-app.use(
-  cors({
-    origin: (origin, callback) => {
-      if (!origin) return callback(null, true);
 
-      const allowed = allowedOrigins.some((o) =>
-        o instanceof RegExp ? o.test(origin) : o === origin
-      );
-
-      if (allowed) callback(null, true);
-      else callback(new Error("Not allowed by CORS"));
-    },
-    credentials: true,
-    methods: ["GET", "POST", "PUT", "DELETE", "PATCH"],
-    allowedHeaders: ["Content-Type", "Authorization"],
-  })
-);
 
 
 // app.options("/*", cors());

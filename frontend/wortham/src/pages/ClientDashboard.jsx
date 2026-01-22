@@ -23,11 +23,23 @@ export const ClientDashboard = ({ onLogout }) => {
   if (!token) return;
 
   fetch(`${API}/api/client/projects`, {
-    headers: { Authorization: `Bearer ${token}` },
+    method: "GET",
+    headers: {
+      "Content-Type": "application/json",
+      Authorization: `Bearer ${token}`,
+    },
   })
-    .then((r) => r.json())
-    .then((d) => setProjects(d.projects || []));
-}, [API, token]);
+    .then(async (r) => {
+      const data = await r.json();
+      if (!r.ok) throw new Error(data.error || "Failed");
+      return data;
+    })
+    .then((d) => setProjects(d.projects || []))
+    .catch((err) => {
+      console.error("CLIENT PROJECT ERROR:", err.message);
+    });
+}, [token]);
+
 
   return (
     <div style={{ padding: 20 }}>
