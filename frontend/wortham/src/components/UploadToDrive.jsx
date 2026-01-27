@@ -1,62 +1,109 @@
 import { useEffect, useRef, useState } from "react";
 
-export const UploadToDrive = ({ clientId, projectId }) => {
+export const UploadToDrive = ({ clientId, project, onUploaded, onError }) => {
   const [file, setFile] = useState(null);
   const [busy, setBusy] = useState(false);
   const [msg, setMsg] = useState("");
   const [progress, setProgress] = useState(0);
 
+
+  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+
+  // ✅ list states
   const [files, setFiles] = useState([]);
   const [loadingList, setLoadingList] = useState(false);
 
-  const API = import.meta.env.VITE_API_URL || "http://localhost:5000";
+  const token = localStorage.getItem("token") || "";
   const fileRef = useRef(null);
 
-  // ✅ fetch uploaded files (public)
+  useEffect(() => {
+    try {
+      const params = new URLSearchParams(window.location.search);
+      if (params.get("google") === "connected") {
+        setMsg("✅ Google Drive connected!");
+      }
+    } catch {}
+  }, []);
+
+  const safeJson = async (res) => {
+    const ct = res.headers.get("content-type") || "";
+    if (ct.includes("application/json")) return await res.json();
+    const text = await res.text();
+    throw new Error(text?.slice(0, 180) || "Non-JSON response from server");
+  };
+
+  const connectDrive = async () => {
+    try {
+      setMsg("");
+      setBusy(true);
+
+      const res = await fetch(`${API}/api/files/google/connect`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
+
+      const data = await safeJson(res);
+      if (!res.ok || !data.ok) throw new Error(data.error || "Failed to connect Google");
+
+      window.location.href = data.url;
+    } catch (e) {
+      const errMsg = e.message || "Connect failed";
+      setMsg(errMsg);
+      if (onError) onError(errMsg);
+    } finally {
+      setBusy(false);
+    }
+  };
+
+  // ✅ FETCH LIST
   const fetchFiles = async () => {
     try {
       if (!clientId) return;
       setLoadingList(true);
 
-      const res = await fetch(`${API}/api/files/list/${clientId}`);
-      const data = await res.json();
+      const res = await fetch(`${API}/api/files/list/${clientId}`, {
+        headers: { Authorization: `Bearer ${token}` },
+      });
 
-      if (!res.ok || !data.ok) {
-        throw new Error(data.error || "Failed to load files");
-      }
+      const data = await safeJson(res);
+      if (!res.ok || !data.ok) throw new Error(data.error || "Failed to load files");
 
       setFiles(data.files || []);
     } catch (e) {
-      setMsg(e.message || "Failed to load files");
+      const errMsg = e.message || "Failed to load files";
+      setMsg(errMsg);
+      if (onError) onError(errMsg);
     } finally {
       setLoadingList(false);
     }
   };
 
+  // auto-load list when clientId changes
   useEffect(() => {
     fetchFiles();
-    // eslint-disable-next-line
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [clientId]);
 
-  // ✅ upload with progress (NO LOGIN)
+  // ✅ XHR upload for real progress %
   const uploadFile = async () => {
     try {
       setMsg("");
       setProgress(0);
 
-      if (!clientId) throw new Error("Client not found");
-      if (!projectId) throw new Error("Project not found");
-      if (!file) throw new Error("Please choose a file");
+      if (!clientId) throw new Error("clientId missing (project client not found)");
+      if (!file) throw new Error("Please choose a file first");
+      if (!token) throw new Error("Token missing. Please login again.");
 
       setBusy(true);
 
       const fd = new FormData();
       fd.append("file", file);
-      fd.append("projectId", projectId);
+      fd.append("projectId", project._id);
 
       await new Promise((resolve, reject) => {
         const xhr = new XMLHttpRequest();
+
         xhr.open("POST", `${API}/api/files/upload/${clientId}`, true);
+        xhr.setRequestHeader("Authorization", `Bearer ${token}`);
 
         xhr.upload.onprogress = (evt) => {
           if (!evt.lengthComputable) return;
@@ -66,46 +113,64 @@ export const UploadToDrive = ({ clientId, projectId }) => {
 
         xhr.onload = () => {
           try {
-            const data = JSON.parse(xhr.responseText || "{}");
+            const ct = xhr.getResponseHeader("content-type") || "";
+            const isJson = ct.includes("application/json");
+            const data = isJson ? JSON.parse(xhr.responseText || "{}") : null;
 
-            if (xhr.status >= 200 && xhr.status < 300 && data.ok) {
+            if (xhr.status >= 200 && xhr.status < 300 && data?.ok) {
               setProgress(100);
-              setMsg("✅ Uploaded successfully");
+              setMsg("✅ Uploaded!");
               setFile(null);
               if (fileRef.current) fileRef.current.value = "";
+              if (onUploaded) onUploaded(data.file);
+
               resolve();
             } else {
-              reject(new Error(data.error || "Upload failed"));
+              const errMsg = data?.error || xhr.responseText?.slice(0, 180) || "Upload failed";
+              reject(new Error(errMsg));
             }
           } catch {
             reject(new Error("Invalid server response"));
           }
         };
 
-        xhr.onerror = () => reject(new Error("Network error"));
+        xhr.onerror = () => reject(new Error("Network error during upload"));
         xhr.send(fd);
       });
 
+      // ✅ refresh list after upload
       await fetchFiles();
     } catch (e) {
-      setMsg(e.message || "Upload failed");
+      const errMsg = e.message || "Upload failed";
+      setMsg(errMsg);
+      if (onError) onError(errMsg);
     } finally {
       setBusy(false);
     }
   };
 
   return (
-    <div style={{ border: "1px solid #eee", padding: 14, borderRadius: 12 }}>
-      <h4 style={{ margin: 0, marginBottom: 10 }}>
-        Upload Files
-      </h4>
+    <div style={{ border: "1px solid #eee", padding: 12, borderRadius: 12 }}>
+      <h4 style={{ margin: 0, marginBottom: 10 }}>Upload (Client Drive)</h4>
+
+      <button
+        type="button"
+        onClick={connectDrive}
+        disabled={busy}
+        style={{
+          padding: "8px 10px",
+          borderRadius: 10,
+          border: "1px solid #ddd",
+          background: "#fff",
+          cursor: "pointer",
+          marginBottom: 10,
+        }}
+      >
+        {busy ? "Please wait..." : "Connect Google Drive"}
+      </button>
 
       <div style={{ display: "flex", gap: 10, alignItems: "center", flexWrap: "wrap" }}>
-        <input
-          ref={fileRef}
-          type="file"
-          onChange={(e) => setFile(e.target.files?.[0] || null)}
-        />
+        <input ref={fileRef} type="file" onChange={(e) => setFile(e.target.files?.[0] || null)} />
 
         <button
           type="button"
@@ -122,17 +187,32 @@ export const UploadToDrive = ({ clientId, projectId }) => {
         >
           {busy ? "Uploading..." : "Upload"}
         </button>
+
+        <button
+          type="button"
+          onClick={fetchFiles}
+          disabled={loadingList || busy}
+          style={{
+            padding: "10px 14px",
+            borderRadius: 12,
+            border: "1px solid #ddd",
+            background: "#fff",
+            cursor: "pointer",
+          }}
+        >
+          {loadingList ? "Refreshing..." : "Refresh List"}
+        </button>
       </div>
 
-      {/* ✅ progress */}
+      {/* ✅ Progress bar */}
       {busy && progress > 0 && (
         <div style={{ marginTop: 10 }}>
-          <div style={{ fontSize: 12 }}>Uploading… {progress}%</div>
+          <div style={{ fontSize: 12, marginBottom: 6 }}>Uploading... {progress}%</div>
           <div
             style={{
               width: "100%",
               height: 8,
-              background: "#eee",
+              background: "#e8e8e8",
               borderRadius: 999,
               overflow: "hidden",
             }}
@@ -141,7 +221,7 @@ export const UploadToDrive = ({ clientId, projectId }) => {
               style={{
                 height: "100%",
                 width: `${progress}%`,
-                background: "#000",
+                background: "#111",
                 transition: "width 0.15s linear",
               }}
             />
@@ -150,25 +230,19 @@ export const UploadToDrive = ({ clientId, projectId }) => {
       )}
 
       {msg && (
-        <p
-          style={{
-            marginTop: 10,
-            fontSize: 13,
-            color: msg.includes("✅") ? "green" : "red",
-          }}
-        >
+        <p style={{ marginTop: 10, fontSize: 13, color: msg.includes("✅") ? "green" : "red" }}>
           {msg}
         </p>
       )}
 
-      {/* ✅ file list */}
-      <div style={{ marginTop: 16 }}>
-        <h4 style={{ marginBottom: 8 }}>Uploaded Files</h4>
+      {/* ✅ Files list */}
+      <div style={{ marginTop: 14 }}>
+        <h4 style={{ margin: 0, marginBottom: 8 }}>Uploaded Files</h4>
 
         {loadingList ? (
-          <p style={{ fontSize: 13 }}>Loading…</p>
+          <p style={{ fontSize: 13, opacity: 0.8 }}>Loading files...</p>
         ) : files.length === 0 ? (
-          <p style={{ fontSize: 13 }}>No files yet.</p>
+          <p style={{ fontSize: 13, opacity: 0.8 }}>No files found in this client folder.</p>
         ) : (
           <div style={{ display: "grid", gap: 8 }}>
             {files.map((f) => (
@@ -180,27 +254,26 @@ export const UploadToDrive = ({ clientId, projectId }) => {
                   padding: 10,
                   display: "flex",
                   justifyContent: "space-between",
+                  gap: 10,
                 }}
               >
-                <div>
-                  <div style={{ fontSize: 13, fontWeight: 600 }}>
+                <div style={{ minWidth: 0 }}>
+                  <div style={{ fontSize: 13, fontWeight: 600, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>
                     {f.name}
                   </div>
                   <div style={{ fontSize: 12, opacity: 0.7 }}>
-                    {f.modifiedTime
-                      ? new Date(f.modifiedTime).toLocaleString("en-IN")
-                      : ""}
+                    {f.modifiedTime ? new Date(f.modifiedTime).toLocaleString("en-IN") : ""}
                   </div>
                 </div>
 
-                <div style={{ display: "flex", gap: 10 }}>
+                <div style={{ display: "flex", gap: 10, alignItems: "center" }}>
                   {f.webViewLink && (
-                    <a href={f.webViewLink} target="_blank" rel="noreferrer">
+                    <a href={f.webViewLink} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>
                       Open
                     </a>
                   )}
                   {f.webContentLink && (
-                    <a href={f.webContentLink} target="_blank" rel="noreferrer">
+                    <a href={f.webContentLink} target="_blank" rel="noreferrer" style={{ fontSize: 12 }}>
                       Download
                     </a>
                   )}
