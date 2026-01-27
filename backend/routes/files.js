@@ -8,16 +8,17 @@ import { Readable } from "stream";
 import { auth } from "../middleware/auth.js";
 import Client from "../models/Client.js";
 import OAuthToken from "../models/OAuthToken.js";
-import ProjectFile from "../models/ProjectFile.js"; // ⬅️ import at top
-
+import ProjectFile from "../models/ProjectFile.js";
 
 dotenv.config();
 const router = Router();
 
+// =======================
+// CONFIG
+// =======================
 const upload = multer({ storage: multer.memoryStorage() });
 
-const SCOPES = ["https://www.googleapis.com/auth/drive.file"]; 
-// NOTE: drive.file = app-created files only (upload works)
+const SCOPES = ["https://www.googleapis.com/auth/drive.file"];
 
 function getOAuthClient() {
   return new google.auth.OAuth2(
@@ -27,137 +28,96 @@ function getOAuthClient() {
   );
 }
 
-// ✅ 1) CONNECT (Generate URL)
+// =======================
+// 1️⃣ ADMIN / TEAM → GOOGLE CONNECT
+// =======================
 router.get("/google/connect", auth, async (req, res) => {
   try {
-    const missing = [];
-    if (!process.env.GOOGLE_OAUTH_CLIENT_ID) missing.push("GOOGLE_OAUTH_CLIENT_ID");
-    if (!process.env.GOOGLE_OAUTH_CLIENT_SECRET) missing.push("GOOGLE_OAUTH_CLIENT_SECRET");
-    if (!process.env.GOOGLE_OAUTH_REDIRECT_URI) missing.push("GOOGLE_OAUTH_REDIRECT_URI");
-    if (!process.env.GOOGLE_OAUTH_SUCCESS_REDIRECT) missing.push("GOOGLE_OAUTH_SUCCESS_REDIRECT");
-
-    if (missing.length) {
-      return res.status(500).json({
-        ok: false,
-        error: `Missing Google OAuth env: ${missing.join(", ")}`
-      });
-    }
-
     const oauth2Client = getOAuthClient();
 
-    // ✅ state = same JWT token (so callback can identify user)
     const token = req.headers.authorization?.split(" ")[1];
 
     const url = oauth2Client.generateAuthUrl({
       access_type: "offline",
       prompt: "consent",
       scope: SCOPES,
-      state: token, // ✅ important
+      state: token, // JWT
     });
 
-    return res.json({ ok: true, url });
+    res.json({ ok: true, url });
   } catch (err) {
     console.error("GOOGLE CONNECT ERROR:", err);
-    return res.status(500).json({ ok: false, error: "Server Error" });
+    res.status(500).json({ ok: false, error: "Google connect failed" });
   }
 });
 
-// ✅ 2) CALLBACK (Save tokens in DB)
+// =======================
+// 2️⃣ GOOGLE CALLBACK (SAVE TOKENS)
+// =======================
 router.get("/google/callback", async (req, res) => {
   try {
-    const code = req.query.code;
-    const stateToken = req.query.state; // JWT from connect
+    const { code, state } = req.query;
+    if (!code || !state) return res.status(400).send("Invalid callback");
 
-    if (!code) return res.status(400).send("Missing code");
-    if (!stateToken) return res.status(400).send("Missing state");
-
-    // ✅ decode user from state JWT
-    const decoded = jwt.verify(stateToken, process.env.JWT_SECRET); // { id, role }
+    const decoded = jwt.verify(state, process.env.JWT_SECRET);
     const ownerId = decoded.id;
 
     const oauth2Client = getOAuthClient();
     const { tokens } = await oauth2Client.getToken(code);
 
-    // ✅ save tokens
     await OAuthToken.findOneAndUpdate(
       { ownerId },
       { ownerId, tokens },
       { upsert: true, new: true }
     );
 
-    // ✅ redirect to frontend
-    return res.redirect(`${process.env.GOOGLE_OAUTH_SUCCESS_REDIRECT}?google=connected`);
+    res.redirect(
+      `${process.env.GOOGLE_OAUTH_SUCCESS_REDIRECT}?google=connected`
+    );
   } catch (err) {
     console.error("GOOGLE CALLBACK ERROR:", err);
-    return res.status(500).send("OAuth error");
+    res.status(500).send("OAuth failed");
   }
 });
 
-// ✅ 3) UPLOAD FILE (to client's folderId)
-// router.post("/upload/:clientId", auth, upload.single("file"), async (req, res) => {
-//   try {
-//     if (!req.file) return res.status(400).json({ ok: false, error: "file required" });
+// =======================
+// HELPER → GET DRIVE USING ADMIN TOKEN
+// =======================
+async function getDrive() {
+  const saved = await OAuthToken.findOne();
+  if (!saved?.tokens) {
+    throw new Error("Google not connected by admin");
+  }
 
-//     const client = await Client.findById(req.params.clientId);
-//     if (!client?.googleDriveFolderId) {
-//       return res.status(400).json({ ok: false, error: "Client Drive folderId missing" });
-//     }
+  const oauth2Client = getOAuthClient();
+  oauth2Client.setCredentials(saved.tokens);
 
-//     // ✅ tokens load
-//     const saved = await OAuthToken.findOne({ ownerId: req.user.id });
-//     if (!saved?.tokens) {
-//       return res.status(401).json({ ok: false, error: "Google not connected. Connect first." });
-//     }
+  return google.drive({ version: "v3", auth: oauth2Client });
+}
 
-//     const oauth2Client = getOAuthClient();
-//     oauth2Client.setCredentials(saved.tokens);
-
-//     const drive = google.drive({ version: "v3", auth: oauth2Client });
-
-//     const fileMetadata = {
-//       name: req.file.originalname,
-//       parents: [client.googleDriveFolderId],
-//     };
-
-//     // ✅ IMPORTANT FIX: body must be a stream (NOT Buffer)
-//     const media = {
-//       mimeType: req.file.mimetype,
-//       body: Readable.from(req.file.buffer),
-//     };
-
-//     const resp = await drive.files.create({
-//       requestBody: fileMetadata,
-//       media,
-//       fields: "id, name, webViewLink, webContentLink, parents",
-//       supportsAllDrives: true, // shared drive support
-//     });
-
-//     return res.json({ ok: true, file: resp.data });
-//   } catch (err) {
-//     console.error("UPLOAD ERROR:", err);
-//     return res.status(500).json({ ok: false, error: err.message || "Server Error" });
-//   }
-// });
-
-
-
-
-
-router.post("/upload/:clientId", auth, upload.single("file"), async (req, res) => {
+// =======================
+// 3️⃣ CLIENT → UPLOAD FILE (NO LOGIN)
+// =======================
+router.post("/upload/:clientId", upload.single("file"), async (req, res) => {
   try {
     if (!req.file) {
-      return res.status(400).json({ ok: false, error: "file required" });
+      return res.status(400).json({ ok: false, error: "File required" });
     }
 
-    // client find
+    const { projectId } = req.body;
+    if (!projectId) {
+      return res.status(400).json({ ok: false, error: "Project ID missing" });
+    }
+
     const client = await Client.findById(req.params.clientId);
     if (!client?.googleDriveFolderId) {
       return res
         .status(400)
-        .json({ ok: false, error: "Client Drive folderId missing" });
+        .json({ ok: false, error: "Client Drive folder not set" });
     }
 
-    // upload to drive
+    const drive = await getDrive();
+
     const resp = await drive.files.create({
       requestBody: {
         name: req.file.originalname,
@@ -165,73 +125,57 @@ router.post("/upload/:clientId", auth, upload.single("file"), async (req, res) =
       },
       media: {
         mimeType: req.file.mimetype,
-        body: Buffer.from(req.file.buffer),
+        body: Readable.from(req.file.buffer),
       },
-      fields: "id, name, webViewLink",
+      fields: "id,name,webViewLink,webContentLink",
       supportsAllDrives: true,
     });
 
-    // ✅ YAHAN ADD KARNA HAI (IMPORTANT)
     await ProjectFile.create({
-      project: req.body.projectId,   // frontend se bhejna
-      uploadedBy: req.user.id,
-      uploadedByRole: req.user.role, // CLIENT / ADMIN / TEAM_MEMBER
+      project: projectId,
+      uploadedByRole: "CLIENT",
       fileName: resp.data.name,
       driveFileId: resp.data.id,
       driveLink: resp.data.webViewLink,
       remark: "",
     });
 
-    return res.json({
-      ok: true,
-      file: resp.data,
-    });
+    res.json({ ok: true, file: resp.data });
   } catch (err) {
     console.error("UPLOAD ERROR:", err);
-    return res.status(500).json({ ok: false, error: err.message });
+    res.status(500).json({ ok: false, error: err.message });
   }
 });
 
-
-
-
-
-// ✅ LIST FILES IN CLIENT FOLDER
-router.get("/list/:clientId", auth, async (req, res) => {
+// =======================
+// 4️⃣ CLIENT → LIST FILES (NO LOGIN)
+// =======================
+router.get("/list/:clientId", async (req, res) => {
   try {
     const client = await Client.findById(req.params.clientId);
     if (!client?.googleDriveFolderId) {
-      return res.status(400).json({ ok: false, error: "Client Drive folderId missing" });
+      return res
+        .status(400)
+        .json({ ok: false, error: "Client Drive folder not set" });
     }
 
-    const saved = await OAuthToken.findOne({ ownerId: req.user.id });
-    if (!saved?.tokens) {
-      return res.status(401).json({ ok: false, error: "Google not connected. Connect first." });
-    }
-
-    const oauth2Client = getOAuthClient();
-    oauth2Client.setCredentials(saved.tokens);
-
-    const drive = google.drive({ version: "v3", auth: oauth2Client });
-
-    const folderId = client.googleDriveFolderId;
+    const drive = await getDrive();
 
     const resp = await drive.files.list({
-      q: `'${folderId}' in parents and trashed=false`,
+      q: `'${client.googleDriveFolderId}' in parents and trashed=false`,
       fields:
-        "files(id,name,mimeType,modifiedTime,size,webViewLink,webContentLink,iconLink)",
+        "files(id,name,mimeType,modifiedTime,webViewLink,webContentLink)",
       orderBy: "modifiedTime desc",
       pageSize: 50,
       supportsAllDrives: true,
       includeItemsFromAllDrives: true,
     });
 
-    return res.json({ ok: true, files: resp.data.files || [] });
+    res.json({ ok: true, files: resp.data.files || [] });
   } catch (err) {
-    console.error("LIST FILES ERROR:", err);
-    return res.status(500).json({ ok: false, error: err.message || "Server Error" });
+    console.error("LIST ERROR:", err);
+    res.status(500).json({ ok: false, error: err.message });
   }
 });
-
 
 export default router;
